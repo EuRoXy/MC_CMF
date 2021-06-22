@@ -1,6 +1,7 @@
 include("MC.jl")
 
-function hist_pred_vs_real(df)
+function hist_pred_vs_real(df) 
+    # ticks = rd.(binMean, 2)[1:3:end-4]
     h11 = histogram(df.real, bin=binStarts, xticks=ticks, label="real", leg=:topleft, 
             xlabel="CMF", ylabel="Counts", tickfontsize=6, xrotation=45, 
             color=3, lw=0.2, fillalpha=0.5)
@@ -63,4 +64,24 @@ function mae_rmse(df; tit="")
         ylim=(0,ylim2), xlabel="real CMF class", ylabel="Root mean square error", title=tit)
     plot!(rmse_pers, seriestype=:scatter, marker=(0.7, stroke(0)), label="pers", color=4)
     return p21, p22
+end
+
+function viz_err(df, tit; err="mae")
+    gb = groupby(df, :real_cls)
+    if err == "mae"
+        ylab = "Mean absolute error"
+        err_pred = [meanad(g.pred, g.real) for g in gb]
+        err_pers = [meanad(g.pers, g.real) for g in gb]
+        err_pred_n = [meanad(g.pred_n, g.real) for g in gb]
+    elseif err == "rmse"
+        ylab = "Root mean square error"
+        err_pred = [rmsd(g.pred, g.real) for g in gb]
+        err_pers = [rmsd(g.pers, g.real) for g in gb]
+        err_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
+    end    
+    p = plot(err_pred, seriestype=:scatter, marker=(0.7, stroke(0)), leg=:topright, label="pred",
+        xlabel="real CMF class", ylabel=ylab, title=tit) 
+    plot!(err_pred_n, seriestype=:scatter, marker=(0.7, stroke(0)), label="pred_n", color=7)
+    plot!(err_pers, seriestype=:scatter, marker=(0.7, stroke(0)), label="pers", color=4)
+    return p
 end
