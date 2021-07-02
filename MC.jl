@@ -1,6 +1,6 @@
 using NetCDF, Statistics, StatsBase, LinearAlgebra
 using Plots, Plots.PlotMeasures, StatsPlots
-using DataFrames, Distributions
+using DataFrames #, Distributions
 
 getNCvar(fn, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
@@ -43,7 +43,7 @@ function getBins(data, n; op="ep") # divide into n bins
         binWidth = [binStarts[i+1] - binStarts[i] for i in 1:n]
         state = [findlast(data[i] .>= binStarts) for i in 1:length(data)]
     end
-    state[state .> 30] .= 30        #.< 1] .= 1
+    state[state .> n] .= n        #.< 1] .= 1
     df = DataFrame(:data=>data, :cls=>state)
     binMean = [mean(groupby(df, :cls)[i].data) for i in 1:n]
     return state, binStarts, binMean 
@@ -126,7 +126,7 @@ function predict_steps_1d(T, binStarts, data_test, od, n; steps=1)
     return pred 
 end
 
-function predict_steps_2d(T, binStarts, data_test, od, n; steps=1)     
+function predict_steps_2d(T, binStarts, data_test, od, n; steps=1) 
     len = length(data_test)
     pred = zeros(len-od-steps+1) 
     T, binStarts = T, binStarts

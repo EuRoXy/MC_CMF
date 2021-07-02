@@ -85,3 +85,14 @@ function viz_err(df, tit; err="mae")
     plot!(err_pers, seriestype=:scatter, marker=(0.7, stroke(0)), label="pers", color=4)
     return p
 end
+
+function viz_box(df, steps, tit; pred="pred")
+    pred == "new" ? 
+        (dif = df.dif_pred_n[1+steps:end]) :  
+        (dif = df.dif_pred[1+steps:end])
+    pred == "new" ? ylab = "pred_n" : ylab = "pred"
+    b = boxplot(df.real_cls[1:end-steps], dif, leg=false, marker=(0.3, stroke(0)), lw=.7,
+        xticks=(1:2:30, ticks[1:2:30]), xrotation=45,
+        title=tit, xlabel="real CMF class mean at t", ylabel="dif ($(ylab) - real)")
+    return b
+end
