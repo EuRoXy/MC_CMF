@@ -1,8 +1,7 @@
 using NetCDF, Statistics, StatsBase, LinearAlgebra
-using Plots, Plots.PlotMeasures, StatsPlots
 using DataFrames #, Distributions
 
-getNCvar(fn, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
+getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
 dropnan(ar) = filter(ar -> !isnan(ar), ar);
 
@@ -19,11 +18,9 @@ function getCMF(fn)
 end
 
 function classify(arr, binStarts)
-    min = binStarts[1]
-    len = length(arr)
     cls = zeros(Int64, len)
-    for i in 1:len
-        arr[i] ≤ min ? 
+    for i in 1:length(arr)
+        arr[i] ≤ binStarts[1] ? 
             cls[i] = 1 : 
             cls[i] = findlast(arr[i] .> binStarts)
     end
@@ -40,7 +37,7 @@ function getBins(data, n; op="ep") # divide into n bins
         state = Int64.(state)
     elseif op == "ep" # equal population
         binStarts = quantile(data, 0:(1/n):1)
-        binWidth = [binStarts[i+1] - binStarts[i] for i in 1:n]
+#         binWidth = [binStarts[i+1] - binStarts[i] for i in 1:n]
         state = [findlast(data[i] .>= binStarts) for i in 1:length(data)]
     end
     state[state .> n] .= n        #.< 1] .= 1
@@ -97,7 +94,6 @@ function mcPredict(data_test, od, n, T, binStarts) # normal pred
         pred[i] = predict_od(obs, od, n, T)
     end
     cls = classify(pred, binStarts)
-#     cls = replace(cls, nothing=>1)
     return pred, cls
 end
 
@@ -178,4 +174,33 @@ function predict_steps_3d(T, binStarts, data_test, od, n; steps=1)
         end
     end
     return pred 
+end
+
+function getDF(od, steps, n) 
+    df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
+                   :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
+    df.dif_pers = df.pers .- df.real
+    df.dif_cls_pers = df.pers_cls .- df.real_cls
+    
+    T = mcFit(data_train_cls, od, n) # transition matrix
+    pred, pred_cls = mcPredict(data_test, od, n, T, binStarts)   
+    df.pred = pred[1:end-steps]    
+    df.pred_cls = pred_cls[1:end-steps]
+    df.dif_pred = df.pred .- df.real 
+    df.dif_cls_pred = df.pred_cls .- df.real_cls
+    
+    if steps > 1 
+        if od == 1
+            pred_n = predict_steps_1d(T, binStarts, data_test, od, n; steps=steps)
+        elseif od == 2
+            pred_n = predict_steps_2d(T, binStarts, data_test, od, n; steps=steps)
+        elseif od == 3
+            pred_n = predict_steps_3d(T, binStarts, data_test, od, n; steps=steps)
+        end
+        df.pred_n = pred_n
+        df.pred_cls_n = classify(pred_n, binStarts)
+        df.dif_pred_n = df.pred_n .- df.real 
+        df.dif_cls_pred_n = df.pred_cls_n .- df.real_cls;
+    end
+    return df
 end
