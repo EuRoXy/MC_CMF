@@ -8,18 +8,21 @@ dropnan(ar) = filter(ar -> !isnan(ar), ar);
 rd(a::Float64, d) = round(a; digits=d)
 
 #### Data
-function getCMF(fn)
+function getCMF(fn; raw=0)
     ghi = getNCvar(fn, "GHI")
     ghiCS = getNCvar(fn, "CLEAR_SKY_GHI");
     cmf = ghi ./ ghiCS
     cmf_train = cmf[1:523007] # 2004 - 2018
     cmf_test = cmf[523008:end]; # 2019
-    return dropnan(cmf_train), dropnan(cmf_test)
+    raw == 0 ?
+        (return dropnan(cmf_train), dropnan(cmf_test)) :
+        (return cmf_train, cmf_test)
 end
 
 function classify(arr, binStarts)
+    len = length(arr)
     cls = zeros(Int64, len)
-    for i in 1:length(arr)
+    for i in 1:len
         arr[i] ≤ binStarts[1] ? 
             cls[i] = 1 : 
             cls[i] = findlast(arr[i] .> binStarts)
@@ -40,7 +43,8 @@ function getBins(data, n; op="ep") # divide into n bins
 #         binWidth = [binStarts[i+1] - binStarts[i] for i in 1:n]
         state = [findlast(data[i] .>= binStarts) for i in 1:length(data)]
     end
-    state[state .> n] .= n        #.< 1] .= 1
+    state[state .> n] .= n        
+    state[state .< 1] .= 1
     df = DataFrame(:data=>data, :cls=>state)
     binMean = [mean(groupby(df, :cls)[i].data) for i in 1:n]
     return state, binStarts, binMean 
@@ -63,8 +67,7 @@ function mcFit(state, od, n)
             T[ (n^2*(state[i-1]-1) + n*(state[i]-1)) + state[i+1], state[i+2] ] += 1
         end
     end
-    # normalize T
-    rowSums = sum(T; dims=2)
+    rowSums = sum(T; dims=2) # normalize T
     T_norm = T ./ rowSums # normalized transition matrix
     T_norm = replace(T_norm, NaN=>0)
     return T_norm
@@ -176,9 +179,16 @@ function predict_steps_3d(T, binStarts, data_test, od, n; steps=1)
     return pred 
 end
 
-function getDF(od, steps, n) 
-    df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
-                   :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
+function getDF(od, steps, n; test_neib=test_neib) 
+    df0 = DataFrame(:real=>test[2:end], :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
+    filter!(:real => c -> !isnan(c), df0) # remove nan in central real series
+    df = df0[od+steps:end, :]
+    df.pers = df0.real[od:end-steps]
+    df.dif_neib = df.neib .- df.real
+    df.real_cls = data_test_cls[od+steps:end]
+    df.pers_cls = data_test_cls[od:end-steps]    
+#     df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
+#                    :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
     df.dif_pers = df.pers .- df.real
     df.dif_cls_pers = df.pers_cls .- df.real_cls
     
@@ -188,7 +198,7 @@ function getDF(od, steps, n)
     df.pred_cls = pred_cls[1:end-steps]
     df.dif_pred = df.pred .- df.real 
     df.dif_cls_pred = df.pred_cls .- df.real_cls
-    
+        
     if steps > 1 
         if od == 1
             pred_n = predict_steps_1d(T, binStarts, data_test, od, n; steps=steps)

@@ -55,7 +55,7 @@ function mae_rmse(df; tit="")
     ylim2 = ceil(maximum(rmse_pred); digits=1)
     p21 = plot(mae_pred, seriestype=:scatter, marker=(0.7, stroke(0)), leg=:topright, label="pred",
         ylim=(0,ylim1), xlabel="real CMF class", ylabel="Mean absolute error", title=tit)
-    plot!(mae_pers, seriestype=:scatter, marker=(0.7, stroke(0)), label="pers", color=4)
+    plot!(mae_pers, seriestype=:scatter, c, label="pers", color=4)
     
     p22 = plot(rmse_pred, seriestype=:scatter, marker=(0.7, stroke(0)), label="pred", 
         ylim=(0,ylim2), xlabel="real CMF class", ylabel="Root mean square error", title=tit)
