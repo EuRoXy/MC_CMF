@@ -1,5 +1,7 @@
-using NetCDF, Statistics, StatsBase, LinearAlgebra
-using DataFrames #, Distributions
+using NetCDF # read nc 
+using LinearAlgebra, Statistics # shipped with JL
+using StatsBase #, Distributions # core stats 
+using DataFrames # basic data
 
 getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
@@ -9,8 +11,9 @@ rd(a::Float64, d) = round(a; digits=d)
 
 #### Data
 function getCMF(fn; raw=0)
-    ghi = getNCvar(fn, "GHI")
-    ghiCS = getNCvar(fn, "CLEAR_SKY_GHI");
+    fn_ = joinpath("data", fn)
+    ghi = getNCvar(fn_, "GHI")
+    ghiCS = getNCvar(fn_, "CLEAR_SKY_GHI");
     cmf = ghi ./ ghiCS
     cmf_train = cmf[1:523007] # 2004 - 2018
     cmf_test = cmf[523008:end]; # 2019
