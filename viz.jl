@@ -22,7 +22,7 @@ function hist_pred_vs_real(df)
 end
 
 function hist_dif_pred_pers(df, od, step)
-    mn_dif_pred, sd_dif_pred = rd.( [mean(df.dif_pred), std(df.dif_pred)], 3 )
+    mn_dif_pred, sd_dif_pred = rd.( [mean(df.dif_pred), std(df.dif_pred)], 3 ) # wrong coz +/- cancel out
     mn_dif_pers, sd_dif_pers = rd.( [mean(df.dif_pers), std(df.dif_pers)], 3 )
 
     h12 = histogram(df.dif_pers, normalize=:probability, bin=2*N, label="pers", 
@@ -147,17 +147,17 @@ function viz_mn_sd(df; tit="2. order +$(15*2) min")
     return mns, sds
 end
 
-function dif_viz(df, steps)
+function dif_viz(df, steps; city="")
     df.dif_cmf = -df.dif_pers;
     difBinStarts = collect(-0.8:0.1:0.7)
     df.cls_dif_cmf = classify(df.dif_cmf, difBinStarts)
-    df = filter(:dif_neib => d -> !isnan(d), df)
+#     df = filter(:dif_neib => d -> !isnan(d), df)
     
     gb = groupby(df, :cls_dif_cmf)
     bin_mn = [mean(g.dif_cmf) for g in gb]
     dif_pers_mn = [mean(g.dif_pers) for g in gb]
     dif_pred_a = [mean(g.dif_pred) for g in gb]
-    dif_neib = [mean(g.dif_neib) for g in gb]
+#     dif_neib = [mean(g.dif_neib) for g in gb]
     
     if steps == 1
         difs = [dif_pers_mn, dif_pred_a, dif_neib]
@@ -167,15 +167,15 @@ function dif_viz(df, steps)
         difs = [dif_pers_mn, dif_pred_a, dif_pred_b]
         cl = [4 1 7]
     end
-#     steps == 2 ? lab = ["pers" "pred_a" "pred_b"] : lab = false
-    steps == 1 ? lab = ["pers" "pred_a" "neib_w"] : lab = false
+    steps == 2 ? lab = ["pers" "pred_a" "pred_b"] : lab = false
+#     steps == 1 ? lab = ["pers" "pred_a" "neib_w"] : lab = false
     labDic = Dict(1 => ("realₜ₊₁", "predₜ₊₁"), 2 => ("realₜ₊₂", "predₜ₊₂"),
                   3 => ("realₜ₊₃", "predₜ₊₃"), 4 => ("realₜ₊₄", "predₜ₊₄"))
     real, pred = labDic[steps]
-    p = plot(bin_mn, difs, c=cl, label=lab, leg=:bottomleft, frame=:origin, marker=(0.7, stroke(0)), 
-        xlabel="ΔCMF ($(real) - realₜ)", ylabel="$(pred) - $(real)", title="+$(15*steps) min", #left_margin=2px,
-        xticks=rd.(bin_mn,2), xrotation=45, yticks=-1:0.2:1, size=(600, 550), fmt=:png) 
-#         tickfontsize=6, dpi=:150)
+    p = plot(bin_mn, difs, c=cl, label=lab, leg=:topright, frame=:origin, marker=(0.7, stroke(0)), 
+        aspect_ratio=1, tickfontsize=6,  
+        xticks=rd.(bin_mn,2), xrotation=45, yticks=-1:0.2:1,
+        xlabel="ΔCMF ($(real) - realₜ)", ylabel="bias ($(pred) - $(real))", title="$(city)") #" +$(15*steps) min") #, size=(600, 550), 
     return p
 end
 
