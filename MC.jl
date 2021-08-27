@@ -1,5 +1,5 @@
 using NetCDF # read nc 
-using LinearAlgebra, Statistics # shipped with JL
+using LinearAlgebra, Statistics, Dates # shipped with JL
 using StatsBase #, Distributions # core stats 
 using DataFrames # basic data
 
@@ -10,16 +10,44 @@ dropnan(ar) = filter(ar -> !isnan(ar), ar);
 rd(a::Float64, d) = round(a; digits=d)
 
 #### Data
-function getCMF(fn; raw=0)
+function getCMF0(fn; raw=0)
     fn_ = joinpath("data", fn)
     ghi = getNCvar(fn_, "GHI")
     ghiCS = getNCvar(fn_, "CLEAR_SKY_GHI");
     cmf = ghi ./ ghiCS
     cmf_train = cmf[1:523007] # 2004 - 2018
-    cmf_test = cmf[523008:end]; # 2019
+    cmf_test = cmf[523008:end] # 2019
     raw == 0 ?
         (return dropnan(cmf_train), dropnan(cmf_test)) :
         (return cmf_train, cmf_test)
+end
+
+function calCMF(df1)
+    df2 = filter(:ghi => g -> (!iszero(g) & !isnan(g)), df1)
+    df2.cmf = df2.ghi ./ df2.ghiCS
+    return df2
+end
+
+function getCMF(fn) # with timestamp
+    cols = [:yr, :mo, :d, :hr, :min, :ghi, :ghiCS]
+    vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
+    dateDic = Dict(zip(cols, vars))
+    fn_ = joinpath("data", fn)
+    for (c, v) in dateDic
+        @eval $c = getNCvar(fn_, $v)
+    end
+    df = DataFrame(:year=>yr, :month=>mo, :day=>d, :hour=>hr, :minute=>min)
+    dt = map(df -> DateTime(df.year, df.month, df.day, df.hour, df.minute), eachrow(df))
+    df1 = DataFrame(:time=>dt, :ghi=>ghi, :ghiCS=>ghiCS)
+
+    df1_train = df1[1:523007, :]
+    df1_test = df1[523008:end, :];
+    df2_train = calCMF(df1_train)
+    df2_test = calCMF(df1_test)
+
+    cmf_train = df2_train.cmf
+    cmf_test = df2_test.cmf
+    return df2_test, cmf_train, cmf_test
 end
 
 function classify(arr, binStarts)
@@ -182,8 +210,9 @@ function predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=1)
     return pred 
 end
 
-function getDF(od, steps, n, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
-# function getDF(od, steps, n; test_neib=test_neib) 
+#### evaluation
+function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
+# function getDF(od, steps, n) #; test_neib=test_neib) 
 #     df0 = DataFrame(:real=>test[2:end]) #, :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
 #     filter!(:real => c -> !isnan(c), df0) # remove nan in central real series
 #     df = df0[od+steps:end, :]
@@ -236,7 +265,8 @@ function hybrid(df, steps) #; err="mae")
         id = findfirst(row .== minimum(row))
         push!(mae_min, id)
     end
-    dfB.mae_min = mae_min[dfB.real_cls]
+#     dfB.mae_min = mae_min[dfB.real_cls]
+    dfB.mae_min = Int64[0; mae_min[dfB.real_cls[1:end-1]]]
     dfB.hyb_m = map(eachrow(dfB)) do r
         if r.mae_min == 1
             r.pers
@@ -259,7 +289,8 @@ function hybrid(df, steps) #; err="mae")
         id = findfirst(row .== minimum(row))
         push!(rmse_min, id)
     end
-    dfB.rmse_min = rmse_min[dfB.real_cls]
+#     dfB.rmse_min = rmse_min[dfB.real_cls]
+    dfB.rmse_min = Int64[0; rmse_min[dfB.real_cls[1:end-1]]]
     dfB.hyb_r = map(eachrow(dfB)) do r
         if r.rmse_min == 1
             r.pers
@@ -274,4 +305,15 @@ function hybrid(df, steps) #; err="mae")
     dfB.dif_hyb_r = dfB.hyb_r .- dfB.real
     return dfB
 #     return meanad(dfB.hyb, dfB.real), rmsd(dfB.hyb, dfB.real)
+end
+
+function calcGHI(df_ghi, df_cmf, steps; od=2) # test GHI prediction from CAMS GHI_CS & pred CMF
+    df1 = df_ghi[od+steps:end,:]
+    df2 = df_cmf[:, [:pers, :pred, :pred_n]]
+    df3 = hcat(df1, df2)
+
+    df3.ghi_pers = df3.ghiCS .* df3.pers
+    df3.ghi_pred = df3.ghiCS .* df3.pred
+    df3.ghi_pred_n = df3.ghiCS .* df3.pred_n
+    return df3
 end

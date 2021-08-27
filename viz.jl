@@ -1,5 +1,6 @@
-include("MC.jl")
+# include("MC.jl")
 using Plots, StatsPlots, Plots.PlotMeasures # , Measures #
+default(fmt=:png, dpi=:120)
 #=
 viz types
 - histogram
