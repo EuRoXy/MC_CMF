@@ -28,27 +28,27 @@ function calCMF(df1)
     return df2
 end
 
-function getCMF(fn) # with timestamp
-    cols = [:yr, :mo, :d, :hr, :min, :ghi, :ghiCS]
-    vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
-    dateDic = Dict(zip(cols, vars))
-    fn_ = joinpath("data", fn)
-    for (c, v) in dateDic
-        @eval $c = getNCvar(fn_, $v)
-    end
-    df = DataFrame(:year=>yr, :month=>mo, :day=>d, :hour=>hr, :minute=>min)
-    dt = map(df -> DateTime(df.year, df.month, df.day, df.hour, df.minute), eachrow(df))
-    df1 = DataFrame(:time=>dt, :ghi=>ghi, :ghiCS=>ghiCS)
+# function getCMF(fn) # with timestamp
+#     cols = [:yr, :mo, :d, :hr, :mins, :ghi, :ghiCS]
+#     vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
+#     dateDic = Dict(zip(cols, vars))
+#     fn1 = joinpath("data", fn)
+#     for (c, v) in dateDic
+#         @eval $c = getNCvar(fn1, $v)
+#     end
+#     df = DataFrame(:year=>yr, :month=>mo, :day=>d, :hour=>hr, :minute=>mins)
+#     dt = map(df -> DateTime(df.year, df.month, df.day, df.hour, df.minute), eachrow(df))
+#     df1 = DataFrame(:time=>dt, :ghi=>ghi, :ghiCS=>ghiCS)
 
-    df1_train = df1[1:523007, :]
-    df1_test = df1[523008:end, :];
-    df2_train = calCMF(df1_train)
-    df2_test = calCMF(df1_test)
+#     df1_train = df1[1:523007, :]
+#     df1_test = df1[523008:end, :];
+#     df2_train = calCMF(df1_train)
+#     df2_test = calCMF(df1_test)
 
-    cmf_train = df2_train.cmf
-    cmf_test = df2_test.cmf
-    return df2_test, cmf_train, cmf_test
-end
+#     cmf_train = df2_train.cmf
+#     cmf_test = df2_test.cmf
+#     return df2_test, cmf_train, cmf_test
+# end
 
 function classify(arr, binStarts)
     len = length(arr)
@@ -211,8 +211,8 @@ function predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=1)
 end
 
 #### evaluation
-function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
-# function getDF(od, steps, n) #; test_neib=test_neib) 
+# function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
+function getDF(od, steps, n) #; test_neib=test_neib) 
 #     df0 = DataFrame(:real=>test[2:end]) #, :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
 #     filter!(:real => c -> !isnan(c), df0) # remove nan in central real series
 #     df = df0[od+steps:end, :]
