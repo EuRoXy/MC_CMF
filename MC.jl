@@ -17,9 +17,12 @@ function getCMF0(fn; raw=0)
     cmf = ghi ./ ghiCS
     cmf_train = cmf[1:523007] # 2004 - 2018
     cmf_test = cmf[523008:end] # 2019
-    raw == 0 ?
-        (return dropnan(cmf_train), dropnan(cmf_test)) :
-        (return cmf_train, cmf_test)
+    if raw == 0
+        tr, te = dropnan(cmf_train), dropnan(cmf_test)
+    else
+        tr, te = cmf_train, cmf_test
+    end
+    return tr, te
 end
 
 function calCMF(df1)
@@ -27,28 +30,6 @@ function calCMF(df1)
     df2.cmf = df2.ghi ./ df2.ghiCS
     return df2
 end
-
-# function getCMF(fn) # with timestamp
-#     cols = [:yr, :mo, :d, :hr, :mins, :ghi, :ghiCS]
-#     vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
-#     dateDic = Dict(zip(cols, vars))
-#     fn1 = joinpath("data", fn)
-#     for (c, v) in dateDic
-#         @eval $c = getNCvar(fn1, $v)
-#     end
-#     df = DataFrame(:year=>yr, :month=>mo, :day=>d, :hour=>hr, :minute=>mins)
-#     dt = map(df -> DateTime(df.year, df.month, df.day, df.hour, df.minute), eachrow(df))
-#     df1 = DataFrame(:time=>dt, :ghi=>ghi, :ghiCS=>ghiCS)
-
-#     df1_train = df1[1:523007, :]
-#     df1_test = df1[523008:end, :];
-#     df2_train = calCMF(df1_train)
-#     df2_test = calCMF(df1_test)
-
-#     cmf_train = df2_train.cmf
-#     cmf_test = df2_test.cmf
-#     return df2_test, cmf_train, cmf_test
-# end
 
 function classify(arr, binStarts)
     len = length(arr)
@@ -212,25 +193,30 @@ end
 
 #### evaluation
 # function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
-function getDF(od, steps, n) #; test_neib=test_neib) 
-#     df0 = DataFrame(:real=>test[2:end]) #, :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
-#     filter!(:real => c -> !isnan(c), df0) # remove nan in central real series
-#     df = df0[od+steps:end, :]
-#     df.pers = df0.real[od:end-steps]
-#     df.dif_neib = df.neib .- df.real
-#     df.real_cls = data_test_cls[od+steps:end]
-#     df.pers_cls = data_test_cls[od:end-steps]    
-    df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
-                   :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
+function getDF(od, steps, n; test_neib=test_neib, hyb=0) 
+    df0 = df1_test[2:end, :]
+    df0.real = test[2:end]
+    df0.neib = test_neib[1:end-1]
+#     df0 = DataFrame(:real=>test[2:end], :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
+    filter!(:real=> c-> !isnan(c), df0) # remove nan in central real series 
+    df = df0[od+steps:end, :]
+    df.pers = df0.real[od:end-steps]
+    df.dif_neib = df.neib .- df.real
     df.dif_pers = df.pers .- df.real
-    df.dif_cls_pers = df.pers_cls .- df.real_cls
-    
+    df.real_cls = data_test_cls[od+steps:end]
+#     df.pers_cls = data_test_cls[od:end-steps]    
+#     df.real_cls = classify(df.real, binStarts)
+#     df.pers_cls = classify(df.pers, binStarts)
+#     df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
+#                    :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
+#     df.dif_cls_pers = df.pers_cls .- df.real_cls    
+
     T = mcFit(data_train_cls, od, n) # transition matrix
     pred, pred_cls = mcPredict(data_test, od, n, T, binStarts, binMean)   
     df.pred = pred[1:end-steps]    
-    df.pred_cls = pred_cls[1:end-steps]
     df.dif_pred = df.pred .- df.real 
-    df.dif_cls_pred = df.pred_cls .- df.real_cls
+#     df.pred_cls = pred_cls[1:end-steps]
+#     df.dif_cls_pred = df.pred_cls .- df.real_cls
         
     if steps > 1 
         if od == 1
@@ -241,21 +227,28 @@ function getDF(od, steps, n) #; test_neib=test_neib)
             pred_n = predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=steps)
         end
         df.pred_n = pred_n
-        df.pred_cls_n = classify(pred_n, binStarts)
         df.dif_pred_n = df.pred_n .- df.real 
-        df.dif_cls_pred_n = df.pred_cls_n .- df.real_cls;
+#         df.pred_cls_n = classify(pred_n, binStarts)
+#         df.dif_cls_pred_n = df.pred_cls_n .- df.real_cls;
     end
-    return df
+    filter!(:neib => w -> !isnan(w), df) # remove nan in neib (west) real series    
+    if hyb == 1
+        df1 = hybrid(df, steps)
+        return df1
+    else
+        return df
+    end
 end
 
-function hybrid(df, steps) #; err="mae")
+function hybrid(df, steps) 
     dfA = df[1:2:end, :]
     dfB = df[2:2:end, :]
     gb = groupby(dfA, :real_cls)
 #     if err == "mae"
     mae_pers = [meanad(g.pers, g.real) for g in gb]
     mae_pred = [meanad(g.pred, g.real) for g in gb]
-    df1 = DataFrame(:mae_pers=>mae_pers, :mae_pred=>mae_pred) 
+    mae_neib = [meanad(g.neib, g.real) for g in gb]
+    df1 = DataFrame(:mae_pers=>mae_pers, :mae_neib=>mae_neib, :mae_pred=>mae_pred) 
     if steps > 1
         df1.mae_pred_n = [meanad(g.pred_n, g.real) for g in gb]
     end 
@@ -268,18 +261,20 @@ function hybrid(df, steps) #; err="mae")
 #     dfB.mae_min = mae_min[dfB.real_cls]
     dfB.mae_min = Int64[0; mae_min[dfB.real_cls[1:end-1]]]
     dfB.hyb_m = map(eachrow(dfB)) do r
-        if r.mae_min == 1
+        if r.mae_min ≤ 1
             r.pers
         elseif r.mae_min == 2
+            r.neib
+        elseif r.mae_min == 3
             r.pred
         else 
             r.pred_n
         end
     end
-#     elseif err == "rmse"
     rmse_pers = [rmsd(g.pers, g.real) for g in gb]
     rmse_pred = [rmsd(g.pred, g.real) for g in gb]
-    df2 = DataFrame(:rmse_pers=>rmse_pers, :rmse_pred=>rmse_pred)
+    rmse_neib = [rmsd(g.neib, g.real) for g in gb]
+    df2 = DataFrame(:rmse_pers=>rmse_pers, :rmse_neib=>rmse_neib, :rmse_pred=>rmse_pred)
     if steps > 1
         df2.rmse_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
     end
@@ -289,18 +284,18 @@ function hybrid(df, steps) #; err="mae")
         id = findfirst(row .== minimum(row))
         push!(rmse_min, id)
     end
-#     dfB.rmse_min = rmse_min[dfB.real_cls]
     dfB.rmse_min = Int64[0; rmse_min[dfB.real_cls[1:end-1]]]
     dfB.hyb_r = map(eachrow(dfB)) do r
-        if r.rmse_min == 1
+        if r.rmse_min ≤ 1
             r.pers
         elseif r.rmse_min == 2
+            r.neib
+        elseif r.rmse_min == 3
             r.pred
         else
             r.pred_n
         end
     end
-#     end    
     dfB.dif_hyb_m = dfB.hyb_m .- dfB.real
     dfB.dif_hyb_r = dfB.hyb_r .- dfB.real
     return dfB
