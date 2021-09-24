@@ -1,7 +1,8 @@
 using NetCDF # read nc 
 using LinearAlgebra, Statistics, Dates # shipped with JL
-using StatsBase #, Distributions # core stats 
+#using StatsBase #, Distributions # core stats 
 using DataFrames # basic data
+using Distances
 
 getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
@@ -25,9 +26,17 @@ function getCMF0(fn; raw=0)
     return tr, te
 end
 
+function getCMF1(fn) 
+    fn_ = joinpath("data", fn)
+    ghi = getNCvar(fn_, "GHI")
+    ghiCS = getNCvar(fn_, "CLEAR_SKY_GHI");
+    cmf = ghi ./ ghiCS
+    return cmf
+end
+
 function calCMF(df1)
     df2 = filter(:ghi => g -> (!iszero(g) & !isnan(g)), df1)
-    df2.cmf = df2.ghi ./ df2.ghiCS
+    df2.real = df2.ghi ./ df2.ghiCS
     return df2
 end
 
@@ -35,9 +44,12 @@ function classify(arr, binStarts)
     len = length(arr)
     cls = zeros(Int64, len)
     for i in 1:len
-        arr[i] ≤ binStarts[1] ? 
+        arr[i] ≤ binStarts[1] ?
             cls[i] = 1 : 
             cls[i] = findlast(arr[i] .> binStarts)
+        if arr[i] > binStarts[end] 
+            cls[i] = N 
+        end
     end
     return cls
 end  
@@ -108,8 +120,8 @@ function mcPredict(data_test, od, n, T, binStarts, binMean) # normal pred
         obs = data_test[i:i+od-1]
         pred[i] = predict_od(obs, od, n, T, binStarts, binMean)
     end
-    cls = classify(pred, binStarts)
-    return pred, cls
+#     cls = classify(pred, binStarts)
+    return pred #, cls
 end
 
 #### predict from previous prediction
@@ -192,66 +204,107 @@ function predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=1)
 end
 
 #### evaluation
+function getDFtm(fn) # include time stamp for GHI
+    cols = [:yr, :mo, :d, :hr, :mins, :ghi, :ghiCS]
+    vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
+    dateDic = Dict(zip(cols, vars))
+
+    fn1 = joinpath("data", fn)
+#     for (c, v) in dateDic
+#         @eval $c = getNCvar(fn1, $v)
+#     end
+    yr = getNCvar(fn1, vars[1])
+    mo = getNCvar(fn1, vars[2])
+    d = getNCvar(fn1, vars[3])
+    hr = getNCvar(fn1, vars[4])
+    mins = getNCvar(fn1, vars[5])
+    ghi = getNCvar(fn1, vars[6])
+    ghiCS = getNCvar(fn1, vars[7])
+
+    df = DataFrame(:year=>yr, :month=>mo, :day=>d, :hour=>hr, :minute=>mins)
+    dt = map(df -> DateTime(df.year, df.month, df.day, df.hour, df.minute), eachrow(df))
+    df1 = DataFrame(:time=>dt, :month=>mo, :ghi=>ghi, :ghiCS=>ghiCS)
+    return df1
+end
 # function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
-function getDF(od, steps, n; test_neib=test_neib, hyb=0) 
-    df0 = df1_test[2:end, :]
-    df0.real = test[2:end]
-    df0.neib = test_neib[1:end-1]
-#     df0 = DataFrame(:real=>test[2:end], :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
-    filter!(:real=> c-> !isnan(c), df0) # remove nan in central real series 
-    df = df0[od+steps:end, :]
-    df.pers = df0.real[od:end-steps]
-    df.dif_neib = df.neib .- df.real
-    df.dif_pers = df.pers .- df.real
-    df.real_cls = data_test_cls[od+steps:end]
-#     df.pers_cls = data_test_cls[od:end-steps]    
-#     df.real_cls = classify(df.real, binStarts)
-#     df.pers_cls = classify(df.pers, binStarts)
-#     df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
-#                    :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
-#     df.dif_cls_pers = df.pers_cls .- df.real_cls    
+# function getDF(od, steps, n; test_neib=test_neib, hyb=0) 
+#     df0 = df1_test[2:end, :]
+#     df0.real = test[2:end]
+#     df0.neib = test_neib[1:end-1]
+# #     df0 = DataFrame(:real=>test[2:end], :neib=>test_neib[1:end-1]) # neighbor's cmf at prev step
+#     filter!(:real=> c-> !isnan(c), df0) # remove nan in central real series 
+#     df = df0[od+steps:end, :]
+#     df.pers = df0.real[od:end-steps]
+#     df.dif_neib = df.neib .- df.real
+#     df.dif_pers = df.pers .- df.real
+#     df.real_cls = data_test_cls[od+steps:end]
+# #     df.pers_cls = data_test_cls[od:end-steps]    
+# #     df.real_cls = classify(df.real, binStarts)
+# #     df.pers_cls = classify(df.pers, binStarts)
+# #     df = DataFrame(:real=>data_test[od+steps:end], :real_cls=>data_test_cls[od+steps:end], 
+# #                    :pers=>data_test[od:end-steps], :pers_cls=>data_test_cls[od:end-steps])
+# #     df.dif_cls_pers = df.pers_cls .- df.real_cls    
+
+#     T = mcFit(data_train_cls, od, n) # transition matrix
+#     pred, pred_cls = mcPredict(data_test, od, n, T, binStarts, binMean)   
+#     df.pred = pred[1:end-steps]    
+#     df.dif_pred = df.pred .- df.real 
+# #     df.pred_cls = pred_cls[1:end-steps]
+# #     df.dif_cls_pred = df.pred_cls .- df.real_cls
+        
+#     if steps > 1 
+#         if od == 1
+#             pred_n = predict_steps_1d(T, binStarts, binMean, data_test, od, n; steps=steps)
+#         elseif od == 2
+#             pred_n = predict_steps_2d(T, binStarts, binMean, data_test, od, n; steps=steps)
+#         elseif od == 3
+#             pred_n = predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=steps)
+#         end
+#         df.pred_n = pred_n
+#         df.dif_pred_n = df.pred_n .- df.real 
+# #         df.pred_cls_n = classify(pred_n, binStarts)
+# #         df.dif_cls_pred_n = df.pred_cls_n .- df.real_cls;
+#     end
+#     filter!(:neib => w -> !isnan(w), df) # remove nan in neib (west) real series    
+#     if hyb == 1
+#         df1 = hybrid(df, steps)
+#         return df1
+#     else
+#         return df
+#     end
+# end
+
+function getDF(od, steps; n=N, df_test=df1_test, d_test=test, d_neib=test_neib_w) # df, 1-d array, 1-d array
+    df = df_test[(od+steps-1):(end-1), :]
+    df.real = d_test[(od+steps-1):(end-1)]
+    df.pers = d_test[(od-1):(end-steps-1)]
+    df.neib = d_neib[1:end-od-steps+1] 
+    # view(df, 25:35, :)
 
     T = mcFit(data_train_cls, od, n) # transition matrix
-    pred, pred_cls = mcPredict(data_test, od, n, T, binStarts, binMean)   
-    df.pred = pred[1:end-steps]    
-    df.dif_pred = df.pred .- df.real 
-#     df.pred_cls = pred_cls[1:end-steps]
-#     df.dif_cls_pred = df.pred_cls .- df.real_cls
-        
-    if steps > 1 
-        if od == 1
-            pred_n = predict_steps_1d(T, binStarts, binMean, data_test, od, n; steps=steps)
-        elseif od == 2
-            pred_n = predict_steps_2d(T, binStarts, binMean, data_test, od, n; steps=steps)
-        elseif od == 3
-            pred_n = predict_steps_3d(T, binStarts, binMean, data_test, od, n; steps=steps)
-        end
-        df.pred_n = pred_n
-        df.dif_pred_n = df.pred_n .- df.real 
-#         df.pred_cls_n = classify(pred_n, binStarts)
-#         df.dif_cls_pred_n = df.pred_cls_n .- df.real_cls;
-    end
-    filter!(:neib => w -> !isnan(w), df) # remove nan in neib (west) real series    
-    if hyb == 1
-        df1 = hybrid(df, steps)
-        return df1
-    else
-        return df
-    end
+    filter!(:real=> c-> !isnan(c), df) # remove nan in central real series 
+    pred = mcPredict(df.real, od, n, T, binStarts, binMean)   
+    df.pred = vcat(ones(steps) * NaN, pred[1:end-steps+1])
+
+    filter!([:neib, :pers] => (n, p) -> (!isnan(n) & !isnan(p)), df); # remove nan in central real series 
+    # filter!(:neib => w -> !isnan(w), df) # remove nan in neib (west) real series    
+    df.real_cls = classify(df.real, binStarts)
+    df.dif_pers = df.pers .- df.real
+    df.dif_neib = df.neib .- df.real
+    df.dif_pred = df.pred .- df.real     
+    return df
 end
 
-function hybrid(df, steps) 
-    dfA = df[1:2:end, :]
-    dfB = df[2:2:end, :]
+function hybrid(dfA, dfB) # A for eval 2019, B for test 2020
     gb = groupby(dfA, :real_cls)
 #     if err == "mae"
     mae_pers = [meanad(g.pers, g.real) for g in gb]
     mae_pred = [meanad(g.pred, g.real) for g in gb]
     mae_neib = [meanad(g.neib, g.real) for g in gb]
     df1 = DataFrame(:mae_pers=>mae_pers, :mae_neib=>mae_neib, :mae_pred=>mae_pred) 
-    if steps > 1
-        df1.mae_pred_n = [meanad(g.pred_n, g.real) for g in gb]
-    end 
+#     if steps > 1
+#         df1.mae_pred_n = [meanad(g.pred_n, g.real) for g in gb]
+#     end 
     mae_min = Int64[]
     for i in 1:size(df1, 1) 
         row = Array(eachrow(df1)[i])
@@ -275,9 +328,9 @@ function hybrid(df, steps)
     rmse_pred = [rmsd(g.pred, g.real) for g in gb]
     rmse_neib = [rmsd(g.neib, g.real) for g in gb]
     df2 = DataFrame(:rmse_pers=>rmse_pers, :rmse_neib=>rmse_neib, :rmse_pred=>rmse_pred)
-    if steps > 1
-        df2.rmse_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
-    end
+#     if steps > 1
+#         df2.rmse_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
+#     end
     rmse_min = Int64[]
     for i in 1:size(df2, 1) 
         row = Array(eachrow(df2)[i])
@@ -302,13 +355,18 @@ function hybrid(df, steps)
 #     return meanad(dfB.hyb, dfB.real), rmsd(dfB.hyb, dfB.real)
 end
 
-function calcGHI(df_ghi, df_cmf, steps; od=2) # test GHI prediction from CAMS GHI_CS & pred CMF
-    df1 = df_ghi[od+steps:end,:]
-    df2 = df_cmf[:, [:pers, :pred, :pred_n]]
-    df3 = hcat(df1, df2)
-
-    df3.ghi_pers = df3.ghiCS .* df3.pers
-    df3.ghi_pred = df3.ghiCS .* df3.pred
-    df3.ghi_pred_n = df3.ghiCS .* df3.pred_n
-    return df3
+function getGHI(dff, steps)
+    # dff = copy(df24)
+    dff.ghi_pers = dff.ghiCS .* dff.pers
+    dff.ghi_neib = dff.ghiCS .* dff.neib
+    dff.ghi_pred = dff.ghiCS .* dff.pred
+    dff.ghi_hyb_m = dff.ghiCS .* dff.hyb_m
+    dff.ghi_hyb_r= dff.ghiCS .* dff.hyb_r;
+#     if steps > 1
+#         dff.ghi_pred_n = dff.ghiCS .* dff.pred_n
+#         df = dff[:, [:month, :ghi, :ghi_pers, :ghi_neib, :ghi_pred, :ghi_pred_n, :ghi_hyb_m, :ghi_hyb_r]]
+#     else
+    df = dff[:, [:month, :ghi, :ghi_pers, :ghi_neib, :ghi_pred, :ghi_hyb_m, :ghi_hyb_r]]
+#     end
+    return df
 end

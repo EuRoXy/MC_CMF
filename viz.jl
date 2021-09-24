@@ -1,4 +1,3 @@
-# include("MC.jl")
 using Plots, StatsPlots, Plots.PlotMeasures # , Measures #
 default(fmt=:png, dpi=:120)
 #=
@@ -122,86 +121,147 @@ function viz_box(df, steps, tit; pred="pred")
     return b
 end
 
-function viz_mn_sd(df; tit="2. order +$(15*2) min")
+function viz_mn_sd(df; tit="+$(15*2) min")
     gb = groupby(df, :real_cls)
     mns_real = [mean(g.real) for g in gb]
     mns_pers = [mean(g.pers) for g in gb]
     mns_pred = [mean(g.pred) for g in gb]
-    mns_pred_n = [mean(g.pred_n) for g in gb];
+    mns_neib = [mean(g.neib) for g in gb]
 
     sds_real = [std(g.real) for g in gb]
     sds_pers = [std(g.pers) for g in gb]
     sds_pred = [std(g.pred) for g in gb]
-    sds_pred_n = [std(g.pred_n) for g in gb];
-
-    if df == df22 
-        (ylab1, ylab2) = ("mean", "standard deviation") 
-        leg1 = :bottomright
-    else 
-        (ylab1, ylab2) = ("", "")
-        leg1 = :none
-    end
-    mns = plot(binMean, [mns_real, mns_pers, mns_pred, mns_pred_n], c=[3 4 1 7], leg=leg1, 
-            ylabel=ylab1, title=tit)
-    sds = plot(binMean, [sds_real, sds_pers, sds_pred, sds_pred_n], c=[3 4 1 7], leg=false, 
-            xlabel="real CMF", ylabel=ylab2)
-    return mns, sds
-end
-
-function dif_viz(df, steps; city="")
-    df.dif_cmf = -df.dif_pers;
-    difBinStarts = collect(-0.8:0.1:0.7)
-    df.cls_dif_cmf = classify(df.dif_cmf, difBinStarts)
-#     df = filter(:dif_neib => d -> !isnan(d), df)
+    sds_neib = [std(g.neib) for g in gb]    
     
-    gb = groupby(df, :cls_dif_cmf)
-    bin_mn = [mean(g.dif_cmf) for g in gb]
-    dif_pers_mn = [mean(g.dif_pers) for g in gb]
-    dif_pred_a = [mean(g.dif_pred) for g in gb]
-#     dif_neib = [mean(g.dif_neib) for g in gb]
-    
-    if steps == 1
-        difs = [dif_pers_mn, dif_pred_a, dif_neib]
-        cl = [4 1 5]
-    else
-        dif_pred_b = [mean(g.dif_pred_n) for g in gb]
-        difs = [dif_pers_mn, dif_pred_a, dif_pred_b]
-        cl = [4 1 7]
+    if df != df21
+        mns_pred_n = [mean(g.pred_n) for g in gb]
+        sds_pred_n = [std(g.pred_n) for g in gb]
+        mns = [mns_real, mns_pers, mns_pred, mns_pred_n, mns_neib]
+        sds = [sds_real, sds_pers, sds_pred, sds_pred_n, sds_neib]
+        lab = ["real" "pers" "pred_a" "pred_b" "neib_w"]
+        clr = [3 4 1 7 5]
+    else   
+        mns = [mns_real, mns_pers, mns_pred, mns_neib]
+        sds = [sds_real, sds_pers, sds_pred, sds_neib]
+        lab = ["real" "pers" "pred_a" "neib_w"] 
+        clr = [3 4 1 5] 
     end
-    steps == 2 ? lab = ["pers" "pred_a" "pred_b"] : lab = false
-#     steps == 1 ? lab = ["pers" "pred_a" "neib_w"] : lab = false
-    labDic = Dict(1 => ("realₜ₊₁", "predₜ₊₁"), 2 => ("realₜ₊₂", "predₜ₊₂"),
-                  3 => ("realₜ₊₃", "predₜ₊₃"), 4 => ("realₜ₊₄", "predₜ₊₄"))
-    real, pred = labDic[steps]
-    p = plot(bin_mn, difs, c=cl, label=lab, leg=:topright, frame=:origin, marker=(0.7, stroke(0)), 
-        aspect_ratio=1, tickfontsize=6,  
-        xticks=rd.(bin_mn,2), xrotation=45, yticks=-1:0.2:1,
-        xlabel="ΔCMF ($(real) - realₜ)", ylabel="bias ($(pred) - $(real))", title="$(city)") #" +$(15*steps) min") #, size=(600, 550), 
+    p_mns = plot(binMean, mns, c=clr, label=lab, leg=:bottomright, marker=(3, 0.7, :o, stroke(0)),     
+        ylabel="mean")
+    p_sds = plot(binMean, sds, c=clr, leg=false, marker=(3, 0.7, :o, stroke(0)),     
+        ylabel="standard deviation")
+    p = plot(p_mns, p_sds, title=tit, xlabel="real CMF", xticks=xti, xrotation=45, 
+        tickfontsize=7, labelfontsize=10, leftmargin=20px, bottommargin=20px, size=(1200, 500))
     return p
 end
 
-function viz_mn_sd(df; tit="2. order +$(15*2) min", ylim1=0.35)
+function viz_bias(df; tit="+$(15*2) min")
     gb = groupby(df, :real_cls)
-    mns_real = [mean(g.real) for g in gb]
-    mns_pers = [mean(g.pers) for g in gb]
-    mns_pred = [mean(g.pred) for g in gb]
-    mns_pred_n = [mean(g.pred_n) for g in gb];
+    bias_pers = [mean(g.dif_pers) for g in gb]
+    bias_pred = [mean(g.dif_pred) for g in gb]
 
-    sds_real = [std(g.real) for g in gb]
-    sds_pers = [std(g.pers) for g in gb]
-    sds_pred = [std(g.pred) for g in gb]
-    sds_pred_n = [std(g.pred_n) for g in gb];
+    bias_neib = [mean(g.dif_neib) for g in gb]
+    bias_hyb_m = [mean(g.dif_hyb_m) for g in gb]
+    bias_hyb_r = [mean(g.dif_hyb_r) for g in gb]
 
-    if df == df22 
-        (ylab1, ylab2) = ("mean", "standard deviation") 
-        leg1 = :bottomright
-    else 
-        (ylab1, ylab2) = ("", "")
-        leg1 = :none
+    if df != df21
+        bias_pred_n = [mean(g.dif_pred_n) for g in gb]
+        biases = [bias_pers bias_pred bias_pred_n bias_neib bias_hyb_m bias_hyb_r]
+        lab = ["pers" "pred_a" "pred_b" "neib_w" "hyb_m" "hyb_r"]
+        clr = [4 1 7 5 6 2]
+    else   
+        biases = [bias_pers bias_pred bias_neib bias_hyb_m bias_hyb_r]
+        lab = ["pers" "pred_a" "neib_w" "hyb_m" "hyb_r"]
+        clr = [4 1 5 6 2]
     end
-    mns = plot(binMean, [mns_real, mns_pers, mns_pred, mns_pred_n], c=[3 4 1 7], leg=leg1, 
-            ylabel=ylab1, title=tit)
-    sds = plot(binMean, [sds_real, sds_pers, sds_pred, sds_pred_n], c=[3 4 1 7], leg=false, 
-            xlabel="real CMF", ylabel=ylab2, ylim=(0,ylim1))
-    return mns, sds
+
+    bi = plot(binMean, biases, label=lab, c=clr, marker=(2, 0.7, :o, stroke(0)), title=tit)
+    return bi
+end
+
+function viz_dif(df, steps)
+    df.dif_cmf = -df.dif_pers
+    max_dif = floor(maximum(df.dif_cmf); digits=1)
+    min_dif = floor(minimum(df.dif_cmf); digits=1)    
+    difBinStarts = collect(min_dif:0.1:max_dif)
+    df.cls_dif_cmf = classify(df.dif_cmf, difBinStarts)
+#     df = filter(:dif_neib => d -> !isnan(d), df)    
+    gb = groupby(df, :cls_dif_cmf)
+    bin_mn = [mean(g.dif_cmf) for g in gb]
+    mae_pers = [meanad(g.pers, g.real) for g in gb]
+    mae_pred = [meanad(g.pred, g.real) for g in gb]
+    mae_neib = [meanad(g.neib, g.real) for g in gb]
+    mae_hyb_m = [meanad(g.hyb_m, g.real) for g in gb]    
+    if steps != 1
+        mae_pred_b = [meanad(g.pred_n, g.real) for g in gb]
+        maes = [mae_pers mae_pred mae_pred_b mae_neib mae_hyb_m]        
+        clr = [4 1 7 5 6]
+    else
+        maes = [mae_pers mae_pred mae_neib mae_hyb_m]
+        clr = [4 1 5 6]        
+    end        
+    steps == 2 ? lab = ["pers" "pred_a" "pred_b" "neib_w" "hyb_m"] : lab = false
+    labDic = Dict(1 => "realₜ₊₁", 2 => "realₜ₊₂",
+                  3 => "realₜ₊₃", 4 => "realₜ₊₄")
+    real = labDic[steps]
+    p = plot(bin_mn, maes, c=clr, label=lab, leg=:bottomright,
+        marker=(0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
+        xticks=rd.(bin_mn,2), xrotation=45, tickfontsize=6, 
+        xlabel="ΔCMF ($(real) - realₜ)", ylabel="MAE", title="+$(15*steps) min") 
+    return p
+end
+
+function viz_ghi_err(dff, steps; tit="+$(15*2) min"; err="mae")
+    gb = groupby(dff, :month)
+    if err == "mae"
+        errs_pers = [meanad(g.ghi, g.ghi_pers) for g in gb]
+        errs_neib = [meanad(g.ghi, g.ghi_neib) for g in gb]
+        errs_pred = [meanad(g.ghi, g.ghi_pred) for g in gb]
+
+        errs_hyb_m = [meanad(g.ghi, g.ghi_hyb_m) for g in gb]
+        errs_hyb_r = [meanad(g.ghi, g.ghi_hyb_r) for g in gb]
+    elseif err == "rmse"
+        errs_pers = [rmsd(g.ghi, g.ghi_pers) for g in gb]
+        errs_neib = [rmsd(g.ghi, g.ghi_neib) for g in gb]
+        errs_pred = [rmsd(g.ghi, g.ghi_pred) for g in gb]
+
+        errs_hyb_m = [rmsd(g.ghi, g.ghi_hyb_m) for g in gb]
+        errs_hyb_r = [rmsd(g.ghi, g.ghi_hyb_r) for g in gb]
+    end
+#     if steps > 1
+#         maes_pred_n = [meanad(g.ghi, g.ghi_pred_n) for g in gb]
+#         errs = [maes_pers maes_neib maes_pred maes_pred_n maes_hyb_m maes_hyb_r]
+#         clr = [4 5 1 7 6 2]
+#     else
+        errs = [errs_pers errs_neib errs_pred errs_hyb_m errs_hyb_r]
+        clr = [4 5 1 6 2]
+#     end
+    steps == 3 ? 
+        (lab = ["pers" "neib" "pred_" "hyb_m" "hyb_r"]) : 
+        (lab = "")
+    p = plot(errs, c=clr, label=lab, fillalpha=0.5, marker=(0.7, stroke(0)), title=tit)
+    return p # if this work for mae & rmse, then delete next func
+end
+
+function viz_ghi_rmse(dff, steps; tit="+$(15*2) min")
+    gb = groupby(dff, :month)
+    rmses_pers = [rmsd(g.ghi, g.ghi_pers) for g in gb]
+    rmses_neib = [rmsd(g.ghi, g.ghi_neib) for g in gb]
+    rmses_pred = [rmsd(g.ghi, g.ghi_pred) for g in gb]
+
+    rmses_hyb_m = [rmsd(g.ghi, g.ghi_hyb_m) for g in gb]
+    rmses_hyb_r = [rmsd(g.ghi, g.ghi_hyb_r) for g in gb]
+#     if steps > 1
+#         rmses_pred_n = [rmsd(g.ghi, g.ghi_pred_n) for g in gb]
+#         errs = [rmses_pers rmses_neib rmses_pred rmses_pred_n rmses_hyb_m rmses_hyb_r]
+#         clr = [4 5 1 7 6 2]
+#     else
+    errs = [rmses_pers rmses_neib rmses_pred rmses_hyb_m rmses_hyb_r]
+    clr = [4 5 1 6 2]
+#     end
+    steps == 3 ? 
+        (lab = ["pers" "neib" "pred" "hyb_m" "hyb_r"]) : 
+        (lab = "")
+    p = plot(errs, c=clr, label=lab, fillalpha=0.5, marker=(0.7, stroke(0)), title=tit)
+    return p 
 end
