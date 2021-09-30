@@ -194,24 +194,24 @@ function viz_dif(df, steps)
     mae_hyb_m = [meanad(g.hyb_m, g.real) for g in gb]    
     if steps != 1
         mae_pred_b = [meanad(g.pred_n, g.real) for g in gb]
-        maes = [mae_pers mae_pred mae_pred_b mae_neib mae_hyb_m]        
-        clr = [4 1 7 5 6]
+        maes = [mae_pers mae_neib mae_pred mae_pred_b mae_hyb_m]        
+        clr = [4 5 1 7 6]
     else
-        maes = [mae_pers mae_pred mae_neib mae_hyb_m]
-        clr = [4 1 5 6]        
+        maes = [mae_pers mae_neib mae_pred mae_hyb_m]
+        clr = [4 5 1 6]        
     end        
-    steps == 2 ? lab = ["pers" "pred_a" "pred_b" "neib_w" "hyb_m"] : lab = false
-    labDic = Dict(1 => "realₜ₊₁", 2 => "realₜ₊₂",
-                  3 => "realₜ₊₃", 4 => "realₜ₊₄")
+    steps == 2 ? lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m"] : lab = false
+    labDic = Dict(1 => "realₜ₋₁", 2 => "realₜ₋₂",
+                  3 => "realₜ₋₃", 4 => "realₜ₋₄")
     real = labDic[steps]
-    p = plot(bin_mn, maes, c=clr, label=lab, leg=:bottomright,
+    p = plot(bin_mn, maes, c=clr, label=lab, leg=:bottomleft,
         marker=(0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
         xticks=rd.(bin_mn,2), xrotation=45, tickfontsize=6, 
-        xlabel="ΔCMF ($(real) - realₜ)", ylabel="MAE", title="+$(15*steps) min") 
+        xlabel="ΔCMF (realₜ - $(real))", ylabel="MAEₜ", title="+$(15*steps) min") 
     return p
 end
 
-function viz_ghi_err(dff, steps; tit="+$(15*2) min"; err="mae")
+function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
     gb = groupby(dff, :month)
     if err == "mae"
         errs_pers = [meanad(g.ghi, g.ghi_pers) for g in gb]
@@ -228,40 +228,54 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min"; err="mae")
         errs_hyb_m = [rmsd(g.ghi, g.ghi_hyb_m) for g in gb]
         errs_hyb_r = [rmsd(g.ghi, g.ghi_hyb_r) for g in gb]
     end
-#     if steps > 1
-#         maes_pred_n = [meanad(g.ghi, g.ghi_pred_n) for g in gb]
-#         errs = [maes_pers maes_neib maes_pred maes_pred_n maes_hyb_m maes_hyb_r]
-#         clr = [4 5 1 7 6 2]
-#     else
+    if steps > 1
+        err == "mae" ?
+            (errs_pred_n = [meanad(g.ghi, g.ghi_pred_n) for g in gb]) :
+            (errs_pred_n = [rmsd(g.ghi, g.ghi_pred_n) for g in gb])
+        errs = [errs_pers errs_neib errs_pred errs_pred_n errs_hyb_m errs_hyb_r]
+        clr = [4 5 1 7 6 2]
+    else
         errs = [errs_pers errs_neib errs_pred errs_hyb_m errs_hyb_r]
         clr = [4 5 1 6 2]
-#     end
+    end
     steps == 3 ? 
-        (lab = ["pers" "neib" "pred_" "hyb_m" "hyb_r"]) : 
+        (lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m" "hyb_r"]) : 
         (lab = "")
     p = plot(errs, c=clr, label=lab, fillalpha=0.5, marker=(0.7, stroke(0)), title=tit)
-    return p # if this work for mae & rmse, then delete next func
+    return p
 end
 
-function viz_ghi_rmse(dff, steps; tit="+$(15*2) min")
-    gb = groupby(dff, :month)
-    rmses_pers = [rmsd(g.ghi, g.ghi_pers) for g in gb]
-    rmses_neib = [rmsd(g.ghi, g.ghi_neib) for g in gb]
-    rmses_pred = [rmsd(g.ghi, g.ghi_pred) for g in gb]
+function mae_vs_rmse(df1t, df2t, df3t, df4t; tit="Berlin"*" 2020")
+    df1 = df1t[:, [:real, :pers, :neib, :pred, :hyb_m, :hyb_r]] 
+    df2 = df2t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
+    df3 = df3t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
+    df4 = df4t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
 
-    rmses_hyb_m = [rmsd(g.ghi, g.ghi_hyb_m) for g in gb]
-    rmses_hyb_r = [rmsd(g.ghi, g.ghi_hyb_r) for g in gb]
-#     if steps > 1
-#         rmses_pred_n = [rmsd(g.ghi, g.ghi_pred_n) for g in gb]
-#         errs = [rmses_pers rmses_neib rmses_pred rmses_pred_n rmses_hyb_m rmses_hyb_r]
-#         clr = [4 5 1 7 6 2]
-#     else
-    errs = [rmses_pers rmses_neib rmses_pred rmses_hyb_m rmses_hyb_r]
-    clr = [4 5 1 6 2]
-#     end
-    steps == 3 ? 
-        (lab = ["pers" "neib" "pred" "hyb_m" "hyb_r"]) : 
-        (lab = "")
-    p = plot(errs, c=clr, label=lab, fillalpha=0.5, marker=(0.7, stroke(0)), title=tit)
-    return p 
+    len = size(df2, 2)
+    lab = ["pers", "neib", "pred_a", "pred_b", "hyb_m", "hyb_r"];
+
+    df_err = DataFrame(:method => lab)
+
+    mae1 = [meanad(df1[:,1], df1[:,i]) for i in 2:(len-1)]
+    insert!(mae1, 4, NaN)
+    df_err.mae1 = mae1
+    df_err.mae2 = [meanad(df2[:,1], df2[:,i]) for i in 2:len]   
+    df_err.mae3 = [meanad(df3[:,1], df3[:,i]) for i in 2:len]   
+    df_err.mae4 = [meanad(df4[:,1], df4[:,i]) for i in 2:len]
+
+    rmse1 = [rmsd(df1[:,1], df1[:,i]) for i in 2:(len-1)]
+    insert!(rmse1, 4, NaN)
+    df_err.rmse1 = rmse1
+    df_err.rmse2 = [rmsd(df2[:,1], df2[:,i]) for i in 2:len]   
+    df_err.rmse3 = [rmsd(df3[:,1], df3[:,i]) for i in 2:len]   
+    df_err.rmse4 = [rmsd(df4[:,1], df4[:,i]) for i in 2:len] 
+    @show df_err;
+
+    p = plot(leg=:bottomright, #xlim=(0.05, 0.16), #aspect_ratio=1, #ylim=(0,0.25), 
+        xlabel="MAE", ylabel="RMSE", title=tit)
+    clrs = [4, 5, 1, 7, 6, 2]
+    for i in 1:(len-1)
+        plot!(Array(df_err[i,2:5]), Array(df_err[i,6:end]), marker=(3, 0.7, stroke(0)), c=clrs[i], label=lab[i])
+    end
+    return p
 end
