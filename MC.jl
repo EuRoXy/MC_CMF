@@ -1,8 +1,8 @@
 using NetCDF # read nc 
 using LinearAlgebra, Statistics, Dates # shipped with JL
-#using StatsBase #, Distributions # core stats 
+using StatsBase, Distributions # core stats 
 using DataFrames # basic data
-using Distances
+# using Distances
 
 getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
@@ -48,7 +48,7 @@ function classify(arr, binStarts)
             cls[i] = 1 : 
             cls[i] = findlast(arr[i] .> binStarts)
         if arr[i] > binStarts[end] 
-            cls[i] = N 
+            cls[i] = length(binStarts) - 1 # N
         end
     end
     return cls
@@ -228,7 +228,7 @@ function getDFtm(fn) # include time stamp for GHI
 end
 # function getDF(od, steps, n...) #, data_train_cls, data_test, data_test_cls, binStarts, binMean) 
 # function getDF(od, steps, n; test_neib=test_neib, hyb=0) 
-function getDF(od, steps; n=N, df_test=df1_test, d_test=test, d_neib=test_neib_w) # df, 1-d array, 1-d array
+function getDF(od, steps; n=N, df_test=df1_test, d_test=test, d_neib=test_neib_w, data_train_cls=data_train_cls, binStarts=binStarts, binMean=binMean) # df, 1-d array, 1-d array
     df = df_test[(od+steps-1):(end-1), :]
     df.real = d_test[(od+steps-1):(end-1)]
     df.pers = d_test[(od-1):(end-steps-1)]
