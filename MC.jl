@@ -231,13 +231,13 @@ end
 function getDF(od, steps; n=N, df_test=df1_test, d_test=test, d_neib=test_neib_w, data_train_cls=data_train_cls, binStarts=binStarts, binMean=binMean) # df, 1-d array, 1-d array
     df = df_test[(od+steps-1):(end-1), :]
     df.real = d_test[(od+steps-1):(end-1)]
-    df.pers = d_test[(od-1):(end-steps-1)]
-    df.neib = d_neib[1:end-od-steps+1] 
+    df.pers = d_test[1:(end-od-steps+1)]
+    df.neib = d_neib[1:(end-od-steps+1)] 
 
     T = mcFit(data_train_cls, od, n) # transition matrix
     filter!(:real=> c-> !isnan(c), df) # remove nan in central real series 
     pred = mcPredict(df.real, od, n, T, binStarts, binMean)   
-    df.pred = vcat(ones(steps) * NaN, pred[1:end-steps+1])
+    df.pred = vcat(ones(od+steps-1) * NaN, pred[1:end-steps])  
     if steps > 1 
         if od == 1
             pred_n = predict_steps_1d(T, binStarts, binMean, df.real, od, n; steps=steps)
@@ -246,12 +246,11 @@ function getDF(od, steps; n=N, df_test=df1_test, d_test=test, d_neib=test_neib_w
         elseif od == 3
             pred_n = predict_steps_3d(T, binStarts, binMean, df.real, od, n; steps=steps)
         end
-        df.pred_n = vcat(ones(steps) * NaN, pred_n[1:end-steps+1], ones(steps) * NaN)
+        df.pred_n = vcat(ones(od+steps-1) * NaN, pred_n[1:end-steps], ones(steps) * NaN)
         filter!(:pred_n => p_n -> !isnan(p_n), df)
         df.dif_pred_n = df.pred_n .- df.real 
-    end
-    
-    filter!([:neib, :pers] => (n, p) -> (!isnan(n) & !isnan(p)), df)
+    end    
+    filter!([:neib, :pers, :pred] => (n, pe, pr) -> (!isnan(n) & !isnan(pe) & !isnan(pr)), df)
     df.real_cls = classify(df.real, binStarts)
     df.dif_pers = df.pers .- df.real
     df.dif_neib = df.neib .- df.real

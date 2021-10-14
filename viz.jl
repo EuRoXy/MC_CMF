@@ -77,12 +77,12 @@ end
 function viz_err(df, binMean, xti; tit="2. order +$(15*2) min", err="mae")
     gb = groupby(df, :real_cls)
     if err == "mae"
-        ylab = "mean absolute error"
+        ylab = "Mean absolute error"
         tit = tit
         ylim = 0.3
         err_pred = [meanad(g.pred, g.real) for g in gb]
         err_pers = [meanad(g.pers, g.real) for g in gb]
-#         err_pred_n = [meanad(g.pred_n, g.real) for g in gb]
+        err_pred_n = [meanad(g.pred_n, g.real) for g in gb]
         err_neib = [meanad(g.neib, g.real) for g in gb]
     elseif err == "rmse"
         ylab = "root mean square error"
@@ -90,11 +90,11 @@ function viz_err(df, binMean, xti; tit="2. order +$(15*2) min", err="mae")
         ylim = 0.4
         err_pred = [rmsd(g.pred, g.real) for g in gb]
         err_pers = [rmsd(g.pers, g.real) for g in gb]
-#         err_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
+        err_pred_n = [rmsd(g.pred_n, g.real) for g in gb]
         err_neib = [rmsd(g.neib, g.real) for g in gb]
     end   
-    (df == df21_ && err == "mae") ? leg1=:topleft : leg1 = :none
-    if df == df21_ 
+    (df == df1t && err == "mae") ? leg1=:topleft : leg1 = :none
+    if df == df1t 
         errs = [err_pers, err_pred, err_neib]
         clrs = [4 1 5]
         labs = ["pers" "pred_a" "neib_s"]
@@ -195,10 +195,10 @@ function viz_dif(df, steps)
     if steps != 1
         mae_pred_b = [meanad(g.pred_n, g.real) for g in gb]
         maes = [mae_pers mae_neib mae_pred mae_pred_b mae_hyb_m]        
-        clr = [4 5 1 7 6]
+        clr = [4 5 1 7 2]
     else
         maes = [mae_pers mae_neib mae_pred mae_hyb_m]
-        clr = [4 5 1 6]        
+        clr = [4 5 1 2]        
     end        
     steps == 2 ? lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m"] : lab = false
     labDic = Dict(1 => "realₜ₋₁", 2 => "realₜ₋₂",
