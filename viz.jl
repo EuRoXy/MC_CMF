@@ -110,6 +110,28 @@ function viz_err(df, binMean, xti; tit="2. order +$(15*2) min", err="mae")
     return p
 end
 
+function viz_err1(df, binMean, xti; tit="+$(15*2) min", err="mae") # only pers & hyb
+    gb = groupby(df, :real_cls)
+    if err == "mae"
+        ylab = "MAE"
+        err_pers = [meanad(g.pers, g.real) for g in gb]
+        err_hyb_m = [meanad(g.hyb_m, g.real) for g in gb]
+        err_hyb_r = [meanad(g.hyb_r, g.real) for g in gb]
+    elseif err == "rmse"
+        ylab = "RMSE"
+        err_pers = [rmsd(g.pers, g.real) for g in gb]
+        err_hyb_m = [rmsd(g.hyb_m, g.real) for g in gb]
+        err_hyb_r = [rmsd(g.hyb_r, g.real) for g in gb]
+    end   
+    df == df2t ? leg1=:bottomleft : leg1 = :none
+    errs = [err_pers, err_hyb_m, err_hyb_r]       
+    p = plot(binMean, errs, c=[4 2 6], marker=(0.7, stroke(0)), 
+        leg=leg1, label=["pers" "hyb_m" "hyb_r"],
+        xticks=xti, xrotation=45,
+        xlabel="real CMF", ylabel=ylab, title=tit)
+    return p
+end
+
 function viz_box(df, steps, tit; pred="pred")
     pred == "new" ? 
         (dif = df.dif_pred_n[1+steps:end]) :  
@@ -167,16 +189,29 @@ function viz_bias(df; tit="+$(15*2) min")
     if df != df21
         bias_pred_n = [mean(g.dif_pred_n) for g in gb]
         biases = [bias_pers bias_pred bias_pred_n bias_neib bias_hyb_m bias_hyb_r]
-        lab = ["pers" "pred_a" "pred_b" "neib_w" "hyb_m" "hyb_r"]
         clr = [4 1 7 5 6 2]
     else   
         biases = [bias_pers bias_pred bias_neib bias_hyb_m bias_hyb_r]
-        lab = ["pers" "pred_a" "neib_w" "hyb_m" "hyb_r"]
         clr = [4 1 5 6 2]
     end
-
-    bi = plot(binMean, biases, label=lab, c=clr, marker=(2, 0.7, :o, stroke(0)), title=tit)
+    df == df22 ? lab = ["pers" "pred_a" "pred_b" "neib_w" "hyb_m" "hyb_r"] : lab = false
+    bi = plot(binMean, biases, label=lab, leg=:bottomleft, c=clr, marker=(2, 0.7, :o, stroke(0)), title=tit)
     return bi
+end
+function viz_bias_by_cls(df, steps)
+    gb = groupby(df, :real_cls)
+    bias_pers = [mean(g.dif_pers) for g in gb]
+    bias_hyb_m = [mean(g.dif_hyb_m) for g in gb]
+    bias_hyb_r = [mean(g.dif_hyb_r) for g in gb]
+
+    steps == 2 ?
+        leg = :bottomleft :
+        leg = :none
+    p = plot(binMean, [bias_pers bias_hyb_m bias_hyb_r], frame=:zerolines, leg=leg, 
+        label=["pers" "hyb_m" "hyb_r"], c=[4 2 6], marker=(2, 0.7, :o, stroke(0)),  
+        xticks=xti, xrotation=45, 
+        ylabel="bias", title="+$(15*steps) min")
+    return p
 end
 
 function viz_dif(df, steps)
@@ -185,7 +220,7 @@ function viz_dif(df, steps)
     min_dif = floor(minimum(df.dif_cmf); digits=1)    
     difBinStarts = collect(min_dif:0.1:max_dif)
     df.cls_dif_cmf = classify(df.dif_cmf, difBinStarts)
-#     df = filter(:dif_neib => d -> !isnan(d), df)    
+   
     gb = groupby(df, :cls_dif_cmf)
     bin_mn = [mean(g.dif_cmf) for g in gb]
     mae_pers = [meanad(g.pers, g.real) for g in gb]
@@ -208,6 +243,7 @@ function viz_dif(df, steps)
         marker=(0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
         xticks=rd.(bin_mn,2), xrotation=45, tickfontsize=6, 
         xlabel="ΔCMF (realₜ - $(real))", ylabel="MAEₜ", title="+$(15*steps) min") 
+    plot!(twinx(), bin_mn, den, st=:steppost, lw=0.2, lc=3, fill=(0,0.15,:green), leg=:none, frame=:none)
     return p
 end
 
@@ -233,10 +269,10 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
             (errs_pred_n = [meanad(g.ghi, g.ghi_pred_n) for g in gb]) :
             (errs_pred_n = [rmsd(g.ghi, g.ghi_pred_n) for g in gb])
         errs = [errs_pers errs_neib errs_pred errs_pred_n errs_hyb_m errs_hyb_r]
-        clr = [4 5 1 7 6 2]
+        clr = [4 5 1 7 2 6]
     else
         errs = [errs_pers errs_neib errs_pred errs_hyb_m errs_hyb_r]
-        clr = [4 5 1 6 2]
+        clr = [4 5 1 2 6]
     end
     steps == 3 ? 
         (lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m" "hyb_r"]) : 
@@ -245,7 +281,7 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
     return p
 end
 
-function mae_vs_rmse(df1t, df2t, df3t, df4t; tit="Berlin"*" 2020")
+function mae_vs_rmse(df1t, df2t, df3t, df4t; tit=city*" 2020")
     df1 = df1t[:, [:real, :pers, :neib, :pred, :hyb_m, :hyb_r]] 
     df2 = df2t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
     df3 = df3t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
@@ -269,13 +305,54 @@ function mae_vs_rmse(df1t, df2t, df3t, df4t; tit="Berlin"*" 2020")
     df_err.rmse2 = [rmsd(df2[:,1], df2[:,i]) for i in 2:len]   
     df_err.rmse3 = [rmsd(df3[:,1], df3[:,i]) for i in 2:len]   
     df_err.rmse4 = [rmsd(df4[:,1], df4[:,i]) for i in 2:len] 
-    @show df_err;
+#     @show df_err;
 
-    p = plot(leg=:bottomright, #xlim=(0.05, 0.16), #aspect_ratio=1, #ylim=(0,0.25), 
+    p = plot(leg=:bottomright, aspect_ratio=1, #xlim=(0.05, 0.16), ##ylim=(0,0.25), 
         xlabel="MAE", ylabel="RMSE", title=tit)
-    clrs = [4, 5, 1, 7, 6, 2]
+    clrs = [4, 5, 1, 7, 2, 6]
     for i in 1:(len-1)
         plot!(Array(df_err[i,2:5]), Array(df_err[i,6:end]), marker=(3, 0.7, stroke(0)), c=clrs[i], label=lab[i])
+    end
+    return p
+end
+
+function viz_err_city(fn)
+    city = split(fn, ['_', '.'])[2] 
+    df21 = get_df_city(fn, 1; hyb=1)
+    df1 = df21[:,[1, 3, 7, 12, 14]]
+
+    df22 = get_df_city(fn, 2; hyb=1)
+    df2 = df22[:,[1, 3, 7, 11, 16, 18]]
+
+    df23 = get_df_city(fn, 3; hyb=1)
+    df3 = df23[:,[1, 3, 7, 11, 16, 18]]
+
+    df24 = get_df_city(fn, 4; hyb=1)
+    df4 = df24[:,[1, 3, 7, 11, 16, 18]]
+
+    len = size(df2, 2)
+    lab = names(df2)[2:end]
+
+    df_err = DataFrame(:method => lab)
+    mae1 = [meanad(df1[:,1], df1[:,i]) for i in 2:5]
+    insert!(mae1, 3, NaN)
+    df_err.mae1 = mae1
+    df_err.mae2 = [meanad(df2[:,1], df2[:,i]) for i in 2:len]   
+    df_err.mae3 = [meanad(df3[:,1], df3[:,i]) for i in 2:len]   
+    df_err.mae4 = [meanad(df4[:,1], df4[:,i]) for i in 2:len]   
+
+    rmse1 = [rmsd(df1[:,1], df1[:,i]) for i in 2:5]
+    insert!(rmse1, 3, NaN)
+    df_err.rmse1 = rmse1
+    df_err.rmse2 = [rmsd(df2[:,1], df2[:,i]) for i in 2:len]   
+    df_err.rmse3 = [rmsd(df3[:,1], df3[:,i]) for i in 2:len]   
+    df_err.rmse4 = [rmsd(df4[:,1], df4[:,i]) for i in 2:len] 
+    @show df_err;
+    p = plot(leg=:bottomright, xlim=(0,0.2), #ylim=(0,0.25), 
+        xlabel="MAE", ylabel="RMSE", title=city)
+    clrs = [4, 1, 7, 5, 6]
+    for i in 1:5
+        plot!(Array(df_err[i,2:5]), Array(df_err[i,6:end]), marker=(0.7, stroke(0)), c=clrs[i], label=lab[i])
     end
     return p
 end

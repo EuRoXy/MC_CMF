@@ -2,7 +2,6 @@ using NetCDF # read nc
 using LinearAlgebra, Statistics, Dates # shipped with JL
 using StatsBase, Distributions # core stats 
 using DataFrames # basic data
-# using Distances
 
 getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
@@ -336,3 +335,7 @@ function getGHI(dff, steps)
     end
     return df
 end
+
+# apply time steps
+aplTs(df, func) = combine(df, :dif_pers => func => :pers, :dif_neib => func => :neib, :dif_pred => func => :pred, 
+    :dif_hyb_m => func => :hyb_m, :dif_hyb_r => func => :hyb_r)
