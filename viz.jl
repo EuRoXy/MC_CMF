@@ -198,6 +198,7 @@ function viz_bias(df; tit="+$(15*2) min")
     bi = plot(binMean, biases, label=lab, leg=:bottomleft, c=clr, marker=(2, 0.7, :o, stroke(0)), title=tit)
     return bi
 end
+
 function viz_bias_by_cls(df, steps)
     gb = groupby(df, :real_cls)
     bias_pers = [mean(g.dif_pers) for g in gb]
@@ -223,6 +224,7 @@ function viz_dif(df, steps)
    
     gb = groupby(df, :cls_dif_cmf)
     bin_mn = [mean(g.dif_cmf) for g in gb]
+    den = [size(g, 1) for g in gb]
     mae_pers = [meanad(g.pers, g.real) for g in gb]
     mae_pred = [meanad(g.pred, g.real) for g in gb]
     mae_neib = [meanad(g.neib, g.real) for g in gb]

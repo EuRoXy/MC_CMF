@@ -339,3 +339,17 @@ end
 # apply time steps
 aplTs(df, func) = combine(df, :dif_pers => func => :pers, :dif_neib => func => :neib, :dif_pred => func => :pred, 
     :dif_hyb_m => func => :hyb_m, :dif_hyb_r => func => :hyb_r)
+
+function rDif(df; err="mae")
+    gb = groupby(df, :month)
+    if err == "mae"
+        errs_pers = [meanad(g.ghi, g.ghi_pers) for g in gb]
+        errs_hyb_m = [meanad(g.ghi, g.ghi_hyb_m) for g in gb]
+        dif_err = (errs_hyb_m .- errs_pers) ./ ghi_mo
+    elseif err == "rmse"
+        errs_pers = [rmsd(g.ghi, g.ghi_pers) for g in gb]
+        errs_hyb_r = [rmsd(g.ghi, g.ghi_hyb_r) for g in gb]
+        dif_err = (errs_hyb_r .- errs_pers) ./ ghi_mo
+    end
+    return -100dif_err
+end
