@@ -125,8 +125,8 @@ function viz_err1(df, binMean, xti; tit="+$(15*2) min", err="mae") # only pers &
     end   
     df == df2t ? leg1=:bottomleft : leg1 = :none
     errs = [err_pers, err_hyb_m, err_hyb_r]       
-    p = plot(binMean, errs, c=[4 2 6], marker=(0.7, stroke(0)), 
-        leg=leg1, label=["pers" "hyb_m" "hyb_r"],
+    p = plot(binMean, errs, c=[4 "black" "red"], marker=([:d :circ :circ], 0.7, stroke(0)), 
+        leg=leg1, label=["pers" "hyb_m" "hyb_r"], 
         xticks=xti, xrotation=45,
         xlabel="real CMF", ylabel=ylab, title=tit)
     return p
@@ -229,20 +229,23 @@ function viz_dif(df, steps)
     mae_pred = [meanad(g.pred, g.real) for g in gb]
     mae_neib = [meanad(g.neib, g.real) for g in gb]
     mae_hyb_m = [meanad(g.hyb_m, g.real) for g in gb]    
+    mae_hyb_r = [meanad(g.hyb_r, g.real) for g in gb]    
     if steps != 1
         mae_pred_b = [meanad(g.pred_n, g.real) for g in gb]
-        maes = [mae_pers mae_neib mae_pred mae_pred_b mae_hyb_m]        
-        clr = [4 5 1 7 2]
+        maes = [mae_pers mae_neib mae_pred mae_pred_b mae_hyb_m mae_hyb_r]        
+        clr = [4 5 1 7 "black" "red"]
+        mkrs = [:d :circ :circ :circ :circ :circ]
     else
-        maes = [mae_pers mae_neib mae_pred mae_hyb_m]
-        clr = [4 5 1 2]        
+        maes = [mae_pers mae_neib mae_pred mae_hyb_m mae_hyb_r]
+        clr = [4 5 1 "black" "red"] 
+        mkrs = [:d :circ :circ :circ :circ]
     end        
     steps == 2 ? lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m"] : lab = false
     labDic = Dict(1 => "realₜ₋₁", 2 => "realₜ₋₂",
                   3 => "realₜ₋₃", 4 => "realₜ₋₄")
     real = labDic[steps]
     p = plot(bin_mn, maes, c=clr, label=lab, leg=:bottomleft,
-        marker=(0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
+        marker=(mkrs, 0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
         xticks=rd.(bin_mn,2), xrotation=45, tickfontsize=6, 
         xlabel="ΔCMF (realₜ - $(real))", ylabel="MAEₜ", title="+$(15*steps) min") 
     plot!(twinx(), bin_mn, den, st=:steppost, lw=0.2, lc=3, fill=(0,0.15,:green), leg=:none, frame=:none)
@@ -270,16 +273,19 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
         err == "mae" ?
             (errs_pred_n = [meanad(g.ghi, g.ghi_pred_n) for g in gb]) :
             (errs_pred_n = [rmsd(g.ghi, g.ghi_pred_n) for g in gb])
-        errs = [errs_pers errs_neib errs_pred errs_pred_n errs_hyb_m errs_hyb_r]
-        clr = [4 5 1 7 2 6]
+#         errs = [errs_pers errs_neib errs_pred errs_pred_n errs_hyb_m errs_hyb_r]
+#         clr = [4 5 1 7 2 6]
+        errs = [errs_pers errs_hyb_m errs_hyb_r]
+        clr = [4 "black" "red"]
     else
         errs = [errs_pers errs_neib errs_pred errs_hyb_m errs_hyb_r]
         clr = [4 5 1 2 6]
     end
-    steps == 3 ? 
-        (lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m" "hyb_r"]) : 
+    steps == 4 ? 
+        (lab = ["pers" "hyb_m" "hyb_r"]) : 
         (lab = "")
-    p = plot(errs, c=clr, label=lab, fillalpha=0.5, marker=(0.7, stroke(0)), title=tit)
+    p = plot(errs, c=clr, fillalpha=0.5, marker=([:d :circ :circ], 0.7, stroke(0)), ylim=(0, maximum(errs)+.3), label=lab, leg=:bottomright, #
+        xtick=1:12, xlabel="Month", ylabel="MAE GHI [Wh m⁻²]", title=tit)
     return p
 end
 
@@ -311,9 +317,10 @@ function mae_vs_rmse(df1t, df2t, df3t, df4t; tit=city*" 2020")
 
     p = plot(leg=:bottomright, aspect_ratio=1, #xlim=(0.05, 0.16), ##ylim=(0,0.25), 
         xlabel="MAE", ylabel="RMSE", title=tit)
-    clrs = [4, 5, 1, 7, 2, 6]
+    clrs = [4, 5, 1, 7, "black", "red"]
+    mkrs = [:d :circ :circ :circ :circ :circ]
     for i in 1:(len-1)
-        plot!(Array(df_err[i,2:5]), Array(df_err[i,6:end]), marker=(3, 0.7, stroke(0)), c=clrs[i], label=lab[i])
+        plot!(Array(df_err[i,2:5]), Array(df_err[i,6:end]), marker=(mkrs[i], 3, 0.7, stroke(0)), c=clrs[i], label=lab[i])
     end
     return p
 end
