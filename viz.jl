@@ -215,7 +215,7 @@ function viz_bias_by_cls(df, steps)
     return p
 end
 
-function viz_dif(df, steps)
+function viz_dif(df, steps; tit=tit)
     df.dif_cmf = -df.dif_pers
     max_dif = floor(maximum(df.dif_cmf); digits=1)
     min_dif = floor(minimum(df.dif_cmf); digits=1)    
@@ -240,14 +240,14 @@ function viz_dif(df, steps)
         clr = [4 5 1 "black" "red"] 
         mkrs = [:d :circ :circ :circ :circ]
     end        
-    steps == 2 ? lab = ["pers" "neib" "pred_a" "pred_b" "hyb_m"] : lab = false
+    steps == 2 ? lab = ["pers" "neib" "mc_a" "mc_b" "hyb_m" "hyb_r"] : lab = false
     labDic = Dict(1 => "realₜ₋₁", 2 => "realₜ₋₂",
                   3 => "realₜ₋₃", 4 => "realₜ₋₄")
     real = labDic[steps]
     p = plot(bin_mn, maes, c=clr, label=lab, leg=:bottomleft,
         marker=(mkrs, 0.7, stroke(0)), frame=:origin, #aspect_ratio=1, 
         xticks=rd.(bin_mn,2), xrotation=45, tickfontsize=6, 
-        xlabel="ΔCMF (realₜ - $(real))", ylabel="MAEₜ", title="+$(15*steps) min") 
+        xlabel="ΔCMF (realₜ - $(real))", ylabel="MAEₜ", title=tit) 
     plot!(twinx(), bin_mn, den, st=:steppost, lw=0.2, lc=3, fill=(0,0.15,:green), leg=:none, frame=:none)
     return p
 end
@@ -281,7 +281,7 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
         errs = [errs_pers errs_neib errs_pred errs_hyb_m errs_hyb_r]
         clr = [4 5 1 2 6]
     end
-    steps == 4 ? 
+    steps == 1 ? 
         (lab = ["pers" "hyb_m" "hyb_r"]) : 
         (lab = "")
     p = plot(errs, c=clr, fillalpha=0.5, marker=([:d :circ :circ], 0.7, stroke(0)), ylim=(0, maximum(errs)+.3), label=lab, leg=:bottomright, #
@@ -296,7 +296,7 @@ function mae_vs_rmse(df1t, df2t, df3t, df4t; tit=city*" 2020")
     df4 = df4t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
 
     len = size(df2, 2)
-    lab = ["pers", "neib", "pred_a", "pred_b", "hyb_m", "hyb_r"];
+    lab = ["pers", "neib", "mc_a", "mc_b", "hyb_m", "hyb_r"];
 
     df_err = DataFrame(:method => lab)
 
