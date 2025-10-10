@@ -25,6 +25,17 @@ function getCMF0(fn; raw=0)
     return tr, te
 end
 
+function splitVal(df, yrVal)
+    yr = df.yr
+    idYrVal = findfirst(yr .== yrVal)
+    idYrTe = findfirst(yr .== yrVal+1)
+    
+    df_tr = df[1:idYrVal-1,:] # 2004 - 2022
+    df_val = df[idYrVal:idYrTe-1,:] # 2023
+    df_te = df[idYrTe:end,:] # 2024
+    return df_tr, df_val, df_te
+end
+
 function getCMF1(fn) # just for 2020
     fn_ = joinpath("data", fn)
     ghi = getNCvar(fn_, "GHI")
