@@ -10,6 +10,24 @@ dropnan(ar) = filter(ar -> !isnan(ar), ar);
 rd(a::Float64, d) = round(a; digits=d)
 
 #### Data
+function getCmf(fn)
+    cols = [:yr, :mo, :d, :hr, :mins, :ghi, :ghiCS]
+    vars = ["ut_year", "ut_month", "ut_day", "ut_hour", "ut_minute", "GHI", "CLEAR_SKY_GHI"];
+
+    yr = getNCvar(fn, vars[1])
+    mo = getNCvar(fn, vars[2])
+    d = getNCvar(fn, vars[3])
+    hr = getNCvar(fn, vars[4])
+    min = getNCvar(fn, vars[5])
+    ghi = getNCvar(fn, vars[6])
+    ghiCS = getNCvar(fn, vars[7])
+
+    df = DataFrame(:yr=>yr, :mon=>mo, :day=>d, :hr=>hr, :min=>min, :ghi=>ghi, :ghiCS=>ghiCS)
+    df_ = filter(:ghi => g -> (!iszero(g) & !isnan(g)), df)
+    df_.cmf = df_.ghi ./ df_.ghiCS
+    return df_
+end
+    
 function getCMF0(fn; raw=0)
     fn_ = joinpath("data", fn)
     ghi = getNCvar(fn_, "GHI")
@@ -25,15 +43,18 @@ function getCMF0(fn; raw=0)
     return tr, te
 end
 
-function splitVal(df, yrVal)
+function splitVal(df, yrVal; tr=1) # training
     yr = df.yr
     idYrVal = findfirst(yr .== yrVal)
-    idYrTe = findfirst(yr .== yrVal+1)
-    
-    df_tr = df[1:idYrVal-1,:] # 2004 - 2022
+    idYrTe = findfirst(yr .== yrVal+1)    
     df_val = df[idYrVal:idYrTe-1,:] # 2023
     df_te = df[idYrTe:end,:] # 2024
-    return df_tr, df_val, df_te
+    if tr == 1
+        df_tr = df[1:idYrVal-1,:] # 2004 - 2022
+        return df_tr, df_val, df_te
+    else
+        return df_val, df_te
+    end
 end
 
 function getCMF1(fn) # just for 2020
