@@ -1,7 +1,7 @@
 using NetCDF # read nc 
 using LinearAlgebra, Statistics, Dates # shipped with JL
-using StatsBase#, Distributions # core stats 
-using DataFrames # basic data
+using StatsBase #, Distributions # core stats 
+using DataFrames, ShiftedArrays # basic data
 
 getNCvar(fn::String, var::String) = dropdims(ncread(fn, var); dims=(1,2,3));
 
