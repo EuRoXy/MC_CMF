@@ -1,5 +1,4 @@
 using Plots, StatsPlots, Plots.PlotMeasures # , Measures #
-default(fmt=:png, dpi=:120)
 #=
 viz types
 - histogram
@@ -289,15 +288,13 @@ function viz_ghi_err(dff, steps; tit="+$(15*2) min", err="mae")
     return p
 end
 
-function mae_vs_rmse(df1t, df2t, df3t, df4t; tit=city*" 2020")
+function mae_vs_rmse(df1t, df2t, df3t, df4t; lab=labs, tit=city*" 2020")
     df1 = df1t[:, [:real, :pers, :neib, :pred, :hyb_m, :hyb_r]] 
     df2 = df2t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
     df3 = df3t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
     df4 = df4t[:, [:real, :pers, :neib, :pred, :pred_n, :hyb_m, :hyb_r]]
 
     len = size(df2, 2)
-    lab = ["pers", "neib", "mc_a", "mc_b", "hyb_m", "hyb_r"];
-
     df_err = DataFrame(:method => lab)
 
     mae1 = [meanad(df1[:,1], df1[:,i]) for i in 2:(len-1)]
@@ -316,7 +313,7 @@ function mae_vs_rmse(df1t, df2t, df3t, df4t; tit=city*" 2020")
 #     @show df_err;
 
     p = plot(leg=:bottomright, aspect_ratio=1, #xlim=(0.05, 0.16), ##ylim=(0,0.25), 
-        xlabel="MAE", ylabel="RMSE", title=tit)
+        xlabel="Mean absolute error", ylabel="Root mean square error", title=tit)
     clrs = [4, 5, 1, 7, "black", "red"]
     mkrs = [:d :circ :circ :circ :circ :circ]
     for i in 1:(len-1)

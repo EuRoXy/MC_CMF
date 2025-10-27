@@ -9,6 +9,8 @@ dropnan(ar) = filter(ar -> !isnan(ar), ar);
 
 rd(a::Float64, d) = round(a; digits=d)
 
+labs = ["persistence", "neighbor", "markov_a", "markov_b", "hybrid_mae", "hybrid_rmse"]
+
 #### Data
 function getCmf(fn)
     cols = [:yr, :mo, :d, :hr, :mins, :ghi, :ghiCS]
